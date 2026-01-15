@@ -4,6 +4,10 @@ A professional, high-performance order management platform built with **Next.js 
 
 ## ✨ Features
 
+### 💻 Login
+Login page with email and password.
+![Dashboard Overview](./screenshots/login.png)
+
 ### 💻 Professional Dashboard
 Monitor your business at a glance with real-time statistics and revenue charts.
 ![Dashboard Overview](./screenshots/dashboard.png)
