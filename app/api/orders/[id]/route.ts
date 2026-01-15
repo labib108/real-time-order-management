@@ -33,3 +33,44 @@ export async function GET(
         return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
     }
 }
+
+import { emitSocketEvent } from '@/lib/socket-utils'
+
+export async function PATCH(
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params
+        const { status, notes } = await req.json()
+
+        // Create transaction to update status
+        const updatedOrder = await db.$transaction(async (tx) => {
+            const order = await tx.order.update({
+                where: { id },
+                data: { status }
+            })
+
+            // Temporarily disabled status history due to Prisma client sync issues
+            /*
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: id,
+                    status,
+                    notes: notes || `Order status updated to ${status}`
+                }
+            })
+            */
+
+            return order
+        })
+
+        // Emit socket event for real-time update
+        emitSocketEvent('order:update', { id, status })
+
+        return NextResponse.json(updatedOrder)
+    } catch (error) {
+        console.error('Order Patch Error:', error)
+        return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
+    }
+}

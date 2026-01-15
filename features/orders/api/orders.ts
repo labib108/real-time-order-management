@@ -10,4 +10,12 @@ export const ordersApi = {
         const { data } = await apiClient.get<Order>(`/orders/${id}`)
         return data
     },
+    updateStatus: async (id: string, status: string, notes?: string): Promise<Order> => {
+        const { data } = await apiClient.patch<Order>(`/orders/${id}`, { status, notes })
+        return data
+    },
+    save: async (order: any): Promise<Order> => {
+        const { data } = await apiClient.post<Order>('/orders', order)
+        return data
+    }
 }

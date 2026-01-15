@@ -1,14 +1,24 @@
 'use client'
 
-import { Order } from "../types"
+import { Order, OrderStatus } from "../types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { format } from "date-fns"
-import { Package, Truck, User, CreditCard, ChevronLeft } from "lucide-react"
+import { Package, Truck, User, ChevronLeft, AlertCircle, Ban, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { ordersApi } from "../api/orders"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type OrderDetailsProps = {
     order: Order
@@ -19,12 +29,50 @@ const statusVariants: Record<string, "default" | "destructive" | "secondary" | "
     cancelled: "destructive",
     pending: "secondary",
     processing: "outline",
+    shipped: "outline",
+}
+
+const nextStatuses: Record<string, OrderStatus[]> = {
+    pending: ["processing", "cancelled"],
+    processing: ["shipped", "cancelled"],
+    shipped: ["delivered"],
+    delivered: [],
+    cancelled: [],
 }
 
 export function OrderDetails({ order }: OrderDetailsProps) {
+    const queryClient = useQueryClient()
+
+    const { mutate: updateStatus, isPending } = useMutation({
+        mutationFn: ({ status, notes }: { status: string, notes?: string }) =>
+            ordersApi.updateStatus(order.id, status, notes),
+        onMutate: async (newStatus) => {
+            await queryClient.cancelQueries({ queryKey: ['order', order.id] })
+            const previousOrder = queryClient.getQueryData(['order', order.id])
+
+            queryClient.setQueryData(['order', order.id], (old: any) => ({
+                ...old,
+                status: newStatus.status
+            }))
+
+            return { previousOrder }
+        },
+        onError: (err, newStatus, context) => {
+            queryClient.setQueryData(['order', order.id], context?.previousOrder)
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['order', order.id] })
+            queryClient.invalidateQueries({ queryKey: ['orders'] })
+        }
+    })
+
+    const handleStatusUpdate = (status: OrderStatus) => {
+        updateStatus({ status })
+    }
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" asChild>
                         <Link href="/dashboard/orders">
@@ -33,14 +81,61 @@ export function OrderDetails({ order }: OrderDetailsProps) {
                     </Button>
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight">Order #{order.id.slice(0, 8).toUpperCase()}</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Placed on {format(new Date(order.createdAt), "MMMM d, yyyy 'at' h:mm a")}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Badge variant={statusVariants[order.status] || 'secondary'} className="capitalize">
+                                {order.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                                • Placed {format(new Date(order.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            </span>
+                        </div>
                     </div>
                 </div>
-                <Badge variant={statusVariants[order.status] || 'secondary'} className="text-sm px-3 py-1 capitalize">
-                    {order.status}
-                </Badge>
+
+                <div className="flex items-center gap-2">
+                    {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                        <>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" disabled={isPending}>
+                                        Update Status
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Change Status To</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {nextStatuses[order.status].map((status) => (
+                                        <DropdownMenuItem
+                                            key={status}
+                                            onClick={() => handleStatusUpdate(status)}
+                                            className="capitalize"
+                                        >
+                                            {status}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {order.status === 'pending' && (
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleStatusUpdate('cancelled')}
+                                    disabled={isPending}
+                                >
+                                    <Ban className="mr-2 h-4 w-4" />
+                                    Cancel Order
+                                </Button>
+                            )}
+                        </>
+                    )}
+                    {order.status === 'delivered' && (
+                        <div className="flex items-center text-green-600 text-sm font-medium gap-1 px-3">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Completed
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-3">
@@ -148,7 +243,10 @@ export function OrderDetails({ order }: OrderDetailsProps) {
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-sm text-muted-foreground">No history available.</div>
+                                    <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 py-4">
+                                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                                        <span>No history available.</span>
+                                    </div>
                                 )}
                             </div>
                         </CardContent>
@@ -158,3 +256,4 @@ export function OrderDetails({ order }: OrderDetailsProps) {
         </div>
     )
 }
+

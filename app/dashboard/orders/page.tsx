@@ -1,10 +1,20 @@
 'use client'
 
+import { useState } from "react"
 import { useOrders } from "@/features/orders/hooks/use-orders"
 import { OrdersTable } from "@/features/orders/components/orders-table"
 import { OrderFilters } from "@/features/orders/components/order-filters"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react"
+import { CreateOrderForm } from "@/features/orders/components/create-order-form"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 
 export default function OrdersPage() {
     const {
@@ -16,6 +26,8 @@ export default function OrdersPage() {
         nextPage,
         prevPage
     } = useOrders()
+
+    const [open, setOpen] = useState(false)
 
     const handleSort = (field: 'createdAt' | 'total') => {
         const order = filters.sortBy === field && filters.sortOrder === 'desc' ? 'asc' : 'desc'
@@ -29,6 +41,24 @@ export default function OrdersPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Orders</h2>
                     <p className="text-muted-foreground"> Manage and monitor your real-time orders.</p>
                 </div>
+
+                <Dialog open={open} onOpenChange={setOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Order
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Create New Order</DialogTitle>
+                            <DialogDescription>
+                                Fill in the details below to create a new order.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <CreateOrderForm onSuccess={() => setOpen(false)} />
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <OrderFilters
