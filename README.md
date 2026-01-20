@@ -88,4 +88,4 @@ npx tsx scripts/socket-server.ts
 - **Domain-Driven Features**: Code organized by feature area (auth, dashboard, orders) for better maintainability.
 
 ---
-Built with ❤️ by Antigravity
+
